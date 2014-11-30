@@ -23,7 +23,7 @@ function updateWalker(w) {
   }
 
   localSpeed = Math.min(0.99, Math.max(0.05, localSpeed));
-  localSpeed *= 2;
+  localSpeed *= 4;
 
   var alpha = 0.5;
   w.speed = (1 - alpha) * w.speed + alpha * localSpeed;
@@ -31,7 +31,6 @@ function updateWalker(w) {
   var dx = Math.cos(w.direction) * w.speed;
   var dy = Math.sin(w.direction) * w.speed;
 
-  // if (w.color !== 3) {
   w.ddirection += (Math.random() - 0.5) * 0.05;
   w.ddirection = Math.max(-0.05, Math.min(0.05, w.ddirection));
   w.direction += w.ddirection;
@@ -61,16 +60,16 @@ function colorToFillStyle(color) {
 
 function colorToCMYK(color) {
   if (color === 0) {
-    return [0.3, 0, 0, 0];
+    return [1, 0, 0, 0];
   }
   if (color === 1) {
-    return [0, 0.3, 0, 0];
+    return [0, 1, 0, 0];
   }
   if (color === 2) {
-    return [0, 0, 0.3, 0];
+    return [0, 0, 1, 0];
   }
   if (color === 3) {
-    return [0, 0, 0, 0.3];
+    return [0, 0, 0, 1];
   }
   return [0, 0, 0, 0];
 }
