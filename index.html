@@ -1,0 +1,28 @@
+<html>
+<head>
+  <title></title>
+  <style>
+    html, body, canvas {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      padding: 0;
+      background: #000;
+    }
+    canvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      opacity: 0;
+    }
+    #fastslow {
+      z-index: 1;
+      opacity: 1;
+    }
+  </style>
+</head>
+<body>
+<canvas id="fastslow"></canvas>
+<script src="setimmediate.js"></script>
+<script src="script.js"></script>
+</body>
