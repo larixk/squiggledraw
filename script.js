@@ -11,7 +11,7 @@ var src = "test.jpg";
 
 function updateWalker(w, dt) {
 
-  var localSpeed = 1 - getRGBAt(w.x, w.y, w.color);
+  var localSpeed = 1 - getCMYKat(w.x, w.y, w.color);
 
   localSpeed = Math.min(0.99, Math.max(0.05, localSpeed));
 
@@ -25,7 +25,9 @@ function updateWalker(w, dt) {
   var dx = Math.cos(w.direction) * w.speed;
   var dy = Math.sin(w.direction) * w.speed;
 
-  w.direction += (Math.random() - 0.5) * 1;
+  // if (w.color !== 3) {
+  w.direction += (Math.random() - 0.5) * 1.25;
+  // }
 
   w.x += canvas.width + dx * dt;
   w.y += canvas.height + dy * dt;
@@ -37,30 +39,45 @@ function updateWalker(w, dt) {
 
 function colorToFillStyle(color) {
   if (color === 0) {
-    return 'rgba(255, 0, 0, .025)';
+    return 'rgba(0, 255, 255, .1)';
   }
   if (color === 1) {
-    return 'rgba(0, 255, 0, .025)';
+    return 'rgba(255, 0, 255, .1)';
   }
   if (color === 2) {
-    return 'rgba(0, 0, 255, .025)';
+    return 'rgba(255, 255, 0, .1)';
+  }
+  if (color === 3) {
+    return 'rgba(0, 0, 0, .1)';
   }
 }
+// function colorToFillStyle(color) {
+//   if (color === 0) {
+//     return 'rgba(255, 0, 0, .025)';
+//   }
+//   if (color === 1) {
+//     return 'rgba(0, 255, 0, .025)';
+//   }
+//   if (color === 2) {
+//     return 'rgba(0, 0, 255, .025)';
+//   }
+// }
 
 function draw() {
-  // ctx.fillStyle = "rgba(0,0,0,0.004)";
+  // ctx.fillStyle = "rgba(255,255,255,0.005)";
   // ctx.fillRect(0, 0, canvas.width, canvas.height);
-  ctx.save();
-  ctx.globalCompositeOperation = "lighter";
+  // ctx.save();
+  // ctx.globalCompositeOperation = "lighter";
+  // ctx.globalCompositeOperation = "darken";
   walkers.forEach(function(w) {
 
     ctx.fillStyle = colorToFillStyle(w.color);
     ctx.beginPath();
-    ctx.arc(w.x, w.y, 2 * w.size, 0, 2 * Math.PI);
+    ctx.arc(w.x, w.y, 1.5 * w.size, 0, 2 * Math.PI);
     //ctx.rect(w.x, w.y, 5 * w.size, 5 * w.size);
     ctx.fill();
   });
-  ctx.restore();
+  // ctx.restore();
 }
 
 function redraw() {
@@ -76,32 +93,13 @@ function redraw() {
   requestAnimationFrame(redraw);
 }
 
-var lastUpdateTime;
-
-function now() {
-  return new Date().getTime();
-}
-
 function tick() {
-  if (!lastUpdateTime) {
-    lastUpdateTime = now();
-    window.setImmediate(tick);
-    return;
-  }
-  var updateTime = now();
-  var dt = updateTime - lastUpdateTime;
-  var survivors = [];
   walkers.forEach(function(w) {
-    updateWalker(w, dt);
-    if (w.x > 0 && w.x < canvas.width) {
-      if (w.y > 0 && w.y < canvas.height) {
-        survivors.push(w);
-      }
-    }
+    updateWalker(w, 20);
   });
-  lastUpdateTime = updateTime;
 
-  walkers = survivors;
+  draw();
+
   window.setImmediate(tick);
 }
 
@@ -127,6 +125,19 @@ function getRGBAt(x, y, dIndex) {
   var v = srcData.data[index + dIndex];
 
   return v / 256;
+
+}
+
+function getCMYKat(x, y, dIndex) {
+  if (!srcData) {
+    return 0;
+  }
+  var index = Math.floor(x) * 4 + Math.floor(y) * srcData.width * 4;
+  var r = srcData.data[index];
+  var g = srcData.data[index + 1];
+  var b = srcData.data[index + 2];
+
+  return rgb2cmyk(r, g, b)[dIndex];
 
 }
 
@@ -169,7 +180,7 @@ function init() {
       y: Math.floor(Math.random() * canvas.height),
       direction: Math.random() * Math.PI * 2,
       speed: 0,
-      color: i % 3,
+      color: i % 4,
       size: Math.random()
       // x: centerX,
       // y: centerY
@@ -178,7 +189,7 @@ function init() {
 }
 
 tick();
-redraw();
+// redraw();
 init();
 
 // Prepare to allow droppings
@@ -211,4 +222,30 @@ function fileDropped(e) {
     init();
   };
   reader.readAsDataURL(files[0]);
+}
+
+function rgb2cmyk(r, g, b) {
+  var computedC = 0;
+  var computedM = 0;
+  var computedY = 0;
+  var computedK = 0;
+
+  // BLACK
+  if (r === 0 && g === 0 && b === 0) {
+    computedK = 1;
+    return [0, 0, 0, 1];
+  }
+
+  computedC = 1 - (r / 255);
+  computedM = 1 - (g / 255);
+  computedY = 1 - (b / 255);
+
+  var minCMY = Math.min(computedC,
+    Math.min(computedM, computedY));
+  computedC = (computedC - minCMY) / (1 - minCMY);
+  computedM = (computedM - minCMY) / (1 - minCMY);
+  computedY = (computedY - minCMY) / (1 - minCMY);
+  computedK = minCMY;
+
+  return [computedC, computedM, computedY, computedK];
 }
