@@ -2,6 +2,7 @@ var walkers = [];
 
 var canvas;
 var ctx;
+var imageData;
 var srcData;
 
 var FRAME_SKIP = 1;
@@ -9,28 +10,34 @@ var frame = 0;
 
 var src = "test.jpg";
 
-function updateWalker(w, dt) {
+var cmykPixels = [];
 
-  var localSpeed = 1 - getCMYKat(w.x, w.y, w.color);
+function updateWalker(w) {
+
+  var dIndex = w.color === 4 ? 3 : w.color;
+
+  var localSpeed = 1 - getCMYKSrcPixel(w.x, w.y, dIndex);
+
+  if (w.color === 4) {
+    localSpeed = 1 - localSpeed;
+  }
 
   localSpeed = Math.min(0.99, Math.max(0.05, localSpeed));
+  localSpeed *= 2;
 
-  localSpeed *= 0.25;
-
-  w.speed = localSpeed;
-  var alpha = 0.0001;
+  var alpha = 0.5;
   w.speed = (1 - alpha) * w.speed + alpha * localSpeed;
-  // w.size = Math.pow(1 - w.speed, 4);
 
   var dx = Math.cos(w.direction) * w.speed;
   var dy = Math.sin(w.direction) * w.speed;
 
   // if (w.color !== 3) {
-  w.direction += (Math.random() - 0.5) * 1.25;
-  // }
+  w.ddirection += (Math.random() - 0.5) * 0.05;
+  w.ddirection = Math.max(-0.05, Math.min(0.05, w.ddirection));
+  w.direction += w.ddirection;
 
-  w.x += canvas.width + dx * dt;
-  w.y += canvas.height + dy * dt;
+  w.x += canvas.width + dx;
+  w.y += canvas.height + dy;
 
   w.x %= canvas.width;
   w.y %= canvas.height;
@@ -51,33 +58,37 @@ function colorToFillStyle(color) {
     return 'rgba(0, 0, 0, .1)';
   }
 }
-// function colorToFillStyle(color) {
-//   if (color === 0) {
-//     return 'rgba(255, 0, 0, .025)';
-//   }
-//   if (color === 1) {
-//     return 'rgba(0, 255, 0, .025)';
-//   }
-//   if (color === 2) {
-//     return 'rgba(0, 0, 255, .025)';
-//   }
-// }
+
+function colorToCMYK(color) {
+  if (color === 0) {
+    return [0.3, 0, 0, 0];
+  }
+  if (color === 1) {
+    return [0, 0.3, 0, 0];
+  }
+  if (color === 2) {
+    return [0, 0, 0.3, 0];
+  }
+  if (color === 3) {
+    return [0, 0, 0, 0.3];
+  }
+  return [0, 0, 0, 0];
+}
 
 function draw() {
-  // ctx.fillStyle = "rgba(255,255,255,0.005)";
-  // ctx.fillRect(0, 0, canvas.width, canvas.height);
-  // ctx.save();
-  // ctx.globalCompositeOperation = "lighter";
-  // ctx.globalCompositeOperation = "darken";
-  walkers.forEach(function(w) {
 
-    ctx.fillStyle = colorToFillStyle(w.color);
-    ctx.beginPath();
-    ctx.arc(w.x, w.y, 1.5 * w.size, 0, 2 * Math.PI);
-    //ctx.rect(w.x, w.y, 5 * w.size, 5 * w.size);
-    ctx.fill();
+  walkers.forEach(function(w) {
+    var cmyk = colorToCMYK(w.color);
+    var spread = Math.round(w.size);
+
+    for (var dx = -spread; dx <= spread; dx++) {
+      for (var dy = -spread; dy <= spread; dy++) {
+        addCMYKPixel(w.x + dx, w.y + dy, cmyk[0], cmyk[1], cmyk[2], cmyk[3]);
+      }
+    }
+
   });
-  // ctx.restore();
+
 }
 
 function redraw() {
@@ -86,7 +97,7 @@ function redraw() {
   frame %= FRAME_SKIP;
   if (frame === 0) {
     if (ctx) {
-      draw();
+      ctx.putImageData(imagedata, 0, 0);
     }
   }
 
@@ -94,41 +105,14 @@ function redraw() {
 }
 
 function tick() {
-  walkers.forEach(function(w) {
-    updateWalker(w, 20);
-  });
+  walkers.forEach(updateWalker);
 
   draw();
 
   window.setImmediate(tick);
 }
 
-function getLightnessAt(x, y) {
-  if (!srcData) {
-    return 0;
-  }
-  var index = Math.floor(x) * 4 + Math.floor(y) * srcData.width * 4;
-  var r, g, b;
-  r = srcData.data[index];
-  g = srcData.data[index + 1];
-  b = srcData.data[index + 2];
-
-  return (r + g + b) / (256 * 3);
-
-}
-
-function getRGBAt(x, y, dIndex) {
-  if (!srcData) {
-    return 0;
-  }
-  var index = Math.floor(x) * 4 + Math.floor(y) * srcData.width * 4;
-  var v = srcData.data[index + dIndex];
-
-  return v / 256;
-
-}
-
-function getCMYKat(x, y, dIndex) {
+function getCMYKSrcPixel(x, y, dIndex) {
   if (!srcData) {
     return 0;
   }
@@ -146,6 +130,8 @@ function loadImage() {
   document.body.appendChild(srcCanvas);
   var srcCtx = srcCanvas.getContext("2d");
   var img = new Image();
+  img.crossOrigin = "Anonymous";
+
   img.onload = function() {
     var width = canvas.width;
     var height = canvas.height;
@@ -166,30 +152,35 @@ function init() {
   canvas.width = canvas.parentNode.offsetWidth;
   canvas.height = canvas.parentNode.offsetHeight;
 
+  ctx.fillStyle = "rgba(255,255,255,1)";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  imagedata = ctx.getImageData(0, 0, canvas.width, canvas.height);
+
+  cmykPixels = [];
+  for (var i = 0; i < canvas.width * canvas.height; i++) {
+    cmykPixels.push([0, 0, 0, 0]);
+  }
+
   initFileDrop();
   loadImage();
 
-  var centerX = Math.floor(canvas.width / 2);
-  var centerY = Math.floor(canvas.height / 2);
-
   walkers = [];
 
-  for (var i = 0; i < 5000; i++) {
+  for (var i = 0; i < 320; i++) {
     walkers.push({
       x: Math.floor(Math.random() * canvas.width),
       y: Math.floor(Math.random() * canvas.height),
       direction: Math.random() * Math.PI * 2,
-      speed: 0,
-      color: i % 4,
-      size: Math.random()
-      // x: centerX,
-      // y: centerY
+      ddirection: 0,
+      speed: 20,
+      color: i % 5,
+      size: Math.random() * 2
     });
   }
 }
-
 tick();
-// redraw();
+redraw();
 init();
 
 // Prepare to allow droppings
@@ -200,7 +191,6 @@ function initFileDrop() {
 }
 
 function dragOver(e) {
-  console.log("dragover");
   e.preventDefault();
   return false;
 }
@@ -216,36 +206,136 @@ function fileDropped(e) {
     return;
   }
 
-  var reader = new FileReader();
+  reader = new FileReader();
   reader.onload = function(e) {
     src = e.target.result;
-    init();
+    loadImage();
   };
   reader.readAsDataURL(files[0]);
 }
 
 function rgb2cmyk(r, g, b) {
-  var computedC = 0;
-  var computedM = 0;
-  var computedY = 0;
-  var computedK = 0;
+  var c = 0;
+  var m = 0;
+  var y = 0;
+  var k = 0;
 
   // BLACK
   if (r === 0 && g === 0 && b === 0) {
-    computedK = 1;
+    k = 1;
     return [0, 0, 0, 1];
   }
 
-  computedC = 1 - (r / 255);
-  computedM = 1 - (g / 255);
-  computedY = 1 - (b / 255);
+  c = 1 - (r / 255);
+  m = 1 - (g / 255);
+  y = 1 - (b / 255);
 
-  var minCMY = Math.min(computedC,
-    Math.min(computedM, computedY));
-  computedC = (computedC - minCMY) / (1 - minCMY);
-  computedM = (computedM - minCMY) / (1 - minCMY);
-  computedY = (computedY - minCMY) / (1 - minCMY);
-  computedK = minCMY;
+  var minCMY = Math.min(c, Math.min(m, y));
+  c = (c - minCMY) / (1 - minCMY);
+  m = (m - minCMY) / (1 - minCMY);
+  y = (y - minCMY) / (1 - minCMY);
+  k = minCMY;
 
-  return [computedC, computedM, computedY, computedK];
+  return [c, m, y, k];
 }
+
+function cmyk2rgb(c, m, y, k) {
+
+  r = 1 - Math.min(1, c * (1 - k) + k);
+  g = 1 - Math.min(1, m * (1 - k) + k);
+  b = 1 - Math.min(1, y * (1 - k) + k);
+
+  r = Math.round(r * 255);
+  g = Math.round(g * 255);
+  b = Math.round(b * 255);
+
+  return [r, g, b];
+}
+
+function addCMYKPixel(x, y, c, m, yel, k) {
+
+  var index = coordToIndex(x, y);
+
+  if (index === false) {
+    return;
+  }
+
+  var currentCmyk = cmykPixels[index];
+  var alpha = 0.025;
+  currentCmyk[0] = Math.min(1, currentCmyk[0] + alpha * c);
+  currentCmyk[1] = Math.min(1, currentCmyk[1] + alpha * m);
+  currentCmyk[2] = Math.min(1, currentCmyk[2] + alpha * yel);
+  currentCmyk[3] = Math.min(1, currentCmyk[3] + alpha * k);
+
+  if (c + m + yel + k === 0) {
+    currentCmyk[0] *= 1 - alpha;
+    currentCmyk[1] *= 1 - alpha;
+    currentCmyk[2] *= 1 - alpha;
+    currentCmyk[3] *= 1 - alpha;
+  }
+
+  setCMYKPixel(x, y, currentCmyk[0], currentCmyk[1], currentCmyk[2], currentCmyk[3]);
+}
+
+function setCMYKPixel(x, y, c, m, yel, k) {
+  var rgb = cmyk2rgb(c, m, yel, k);
+  setRGBPixel(x, y, rgb[0], rgb[1], rgb[2]);
+}
+
+function setRGBPixel(x, y, r, g, b) {
+  if (x < 0 || x > imagedata.width) {
+    return;
+  }
+  if (y < 0 || y > imagedata.height) {
+    return;
+  }
+  var index = coordToIndex(x, y) * 4;
+  imagedata.data[index] = r;
+  imagedata.data[index + 1] = g;
+  imagedata.data[index + 2] = b;
+  imagedata.data[index + 3] = 255;
+}
+
+function coordToIndex(x, y) {
+  if (!imagedata) {
+    return false;
+  }
+
+  x = Math.floor(x);
+  y = Math.floor(y);
+
+  if (x < 0 || x >= imagedata.width) {
+    return false;
+  }
+  if (y < 0 || y >= imagedata.height) {
+    return false;
+  }
+  return x + y * imagedata.width;
+}
+
+var flickrImages = [];
+flickrIndex = 0;
+
+function loadFlickrImageURLs() {
+
+  window.loaded = function(data) {
+    flickrImages = data.items;
+    src = flickrImages[0].media.m;
+    loadImage();
+  };
+  var script = document.createElement('script');
+  script.src = 'https://api.flickr.com/services/feeds/photos_public.gne?format=json&jsoncallback=loaded'
+
+  document.getElementsByTagName('head')[0].appendChild(script);
+}
+
+loadFlickrImageURLs();
+
+document.body.addEventListener('click', function(e) {
+  if (flickrImages.length < flickrIndex + 1) {
+    return;
+  }
+  flickrIndex++;
+  src = flickrImages[flickrIndex].media.m;
+  loadImage();
+});
