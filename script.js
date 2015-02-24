@@ -1,3 +1,8 @@
+var NUM_WALKERS = 500;
+var COLOR_ALPHA = 0.01;
+var MAX_SPEED = 1;
+var MIN_SPEED = 0.01;
+
 var walkers = [];
 
 var canvas;
@@ -22,10 +27,10 @@ function updateWalker(w) {
     localSpeed = 1 - localSpeed;
   }
 
-  localSpeed = Math.min(0.99, Math.max(0.05, localSpeed));
-  localSpeed *= 4;
+  localSpeed = Math.min(MAX_SPEED, Math.max(MIN_SPEED, localSpeed));
+  localSpeed *= 1;
 
-  var alpha = 0.5;
+  var alpha = 0.9;
   w.speed = (1 - alpha) * w.speed + alpha * localSpeed;
 
   var dx = Math.cos(w.direction) * w.speed;
@@ -69,7 +74,7 @@ function colorToCMYK(color) {
     return [0, 0, 1, 0];
   }
   if (color === 3) {
-    return [0, 0, 0, 1];
+    return [0, 0, 0, 0.2];
   }
   return [0, 0, 0, 0];
 }
@@ -79,6 +84,7 @@ function draw() {
   walkers.forEach(function(w) {
     var cmyk = colorToCMYK(w.color);
     var spread = Math.round(w.size);
+    var spread = 0;
 
     for (var dx = -spread; dx <= spread; dx++) {
       for (var dy = -spread; dy <= spread; dy++) {
@@ -148,8 +154,8 @@ function init() {
   canvas = document.querySelectorAll('canvas')[0];
   ctx = canvas.getContext("2d");
 
-  canvas.width = canvas.parentNode.offsetWidth;
-  canvas.height = canvas.parentNode.offsetHeight;
+  canvas.width = canvas.parentNode.offsetWidth / 2;
+  canvas.height = canvas.parentNode.offsetHeight / 2;
 
   ctx.fillStyle = "rgba(255,255,255,1)";
   ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -166,7 +172,7 @@ function init() {
 
   walkers = [];
 
-  for (var i = 0; i < 320; i++) {
+  for (var i = 0; i < NUM_WALKERS; i++) {
     walkers.push({
       x: Math.floor(Math.random() * canvas.width),
       y: Math.floor(Math.random() * canvas.height),
@@ -260,7 +266,7 @@ function addCMYKPixel(x, y, c, m, yel, k) {
   }
 
   var currentCmyk = cmykPixels[index];
-  var alpha = 0.025;
+  var alpha = COLOR_ALPHA;
   currentCmyk[0] = Math.min(1, currentCmyk[0] + alpha * c);
   currentCmyk[1] = Math.min(1, currentCmyk[1] + alpha * m);
   currentCmyk[2] = Math.min(1, currentCmyk[2] + alpha * yel);
