@@ -19,10 +19,19 @@
       z-index: 1;
       opacity: 1;
     }
+    #indicator {
+      z-index: 2;
+      opacity: 0;
+      background: transparent;
+    }
+    #indicator:hover {
+      opacity: 0.5;
+    }
   </style>
 </head>
 <body>
 <canvas id="fastslow"></canvas>
+<canvas id="indicator"></canvas>
 <script src="setimmediate.js"></script>
 <script src="script.js"></script>
 </body>

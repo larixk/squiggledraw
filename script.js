@@ -1,6 +1,6 @@
 var walkers = [];
 
-var canvas;
+var canvas, indicator;
 var ctx;
 var imageData;
 var srcData;
@@ -10,30 +10,24 @@ var frame = 0;
 
 var src = "test.jpg";
 
-var cmykPixels = [];
-
 function updateWalker(w) {
 
-  var dIndex = w.color === 4 ? 3 : w.color;
+  var localSpeed = getSrcPixelBrightness(w.x, w.y);
 
-  var localSpeed = 1 - getCMYKSrcPixel(w.x, w.y, dIndex);
-
-  if (w.color === 4) {
+  if (w.color === 1) {
     localSpeed = 1 - localSpeed;
   }
 
-  localSpeed = Math.min(0.99, Math.max(0.05, localSpeed));
-  localSpeed *= 4;
+  localSpeed = Math.max(0.1, localSpeed);
+  var maxTurn = Math.pow(1 - localSpeed, 6);
 
-  var alpha = 0.5;
-  w.speed = (1 - alpha) * w.speed + alpha * localSpeed;
-
-  var dx = Math.cos(w.direction) * w.speed;
-  var dy = Math.sin(w.direction) * w.speed;
-
-  w.ddirection += (Math.random() - 0.5) * 0.05;
-  w.ddirection = Math.max(-0.05, Math.min(0.05, w.ddirection));
+  w.ddirection += (Math.random() - 0.5) * maxTurn;
+  w.ddirection = Math.max(-maxTurn, Math.min(maxTurn, w.ddirection));
   w.direction += w.ddirection;
+
+  localSpeed *= w.speedyness;
+  var dx = Math.cos(w.direction) * localSpeed;
+  var dy = Math.sin(w.direction) * localSpeed;
 
   w.x += canvas.width + dx;
   w.y += canvas.height + dy;
@@ -43,51 +37,15 @@ function updateWalker(w) {
 
 }
 
-function colorToFillStyle(color) {
-  if (color === 0) {
-    return 'rgba(0, 255, 255, .1)';
-  }
-  if (color === 1) {
-    return 'rgba(255, 0, 255, .1)';
-  }
-  if (color === 2) {
-    return 'rgba(255, 255, 0, .1)';
-  }
-  if (color === 3) {
-    return 'rgba(0, 0, 0, .1)';
-  }
-}
+function addPixel(w) {
+  var index = (Math.floor(w.x) + Math.floor(w.y) * imagedata.width) * 4;
+  color = w.color * 255;
+  color = imagedata.data[index] + w.alpha * (color - imagedata.data[index]);
 
-function colorToCMYK(color) {
-  if (color === 0) {
-    return [1, 0, 0, 0];
-  }
-  if (color === 1) {
-    return [0, 1, 0, 0];
-  }
-  if (color === 2) {
-    return [0, 0, 1, 0];
-  }
-  if (color === 3) {
-    return [0, 0, 0, 1];
-  }
-  return [0, 0, 0, 0];
-}
-
-function draw() {
-
-  walkers.forEach(function(w) {
-    var cmyk = colorToCMYK(w.color);
-    var spread = Math.round(w.size);
-
-    for (var dx = -spread; dx <= spread; dx++) {
-      for (var dy = -spread; dy <= spread; dy++) {
-        addCMYKPixel(w.x + dx, w.y + dy, cmyk[0], cmyk[1], cmyk[2], cmyk[3]);
-      }
-    }
-
-  });
-
+  imagedata.data[index] = color;
+  imagedata.data[index + 1] = color;
+  imagedata.data[index + 2] = color;
+  imagedata.data[index + 3] = 255;
 }
 
 function redraw() {
@@ -97,6 +55,17 @@ function redraw() {
   if (frame === 0) {
     if (ctx) {
       ctx.putImageData(imagedata, 0, 0);
+
+      // var indicatorCtx = indicator.getContext("2d");
+      // indicator.width = indicator.width;
+      // walkers.forEach(function(w) {
+      //   var c = w.color * 255;
+      //   indicatorCtx.fillStyle = 'rgba(' + c + ',' + c + ',' + c + ',1)';
+      //   indicatorCtx.beginPath();
+      //   indicatorCtx.arc(Math.floor(w.x), Math.floor(w.y), 10 / w.speedyness, 0, 2 * Math.PI);
+      //   indicatorCtx.fill();
+      //   // indicatorCtx.fillRect(Math.floor(w.x) - 4, Math.floor(w.y) - 4, 8, 8);
+      // });
     }
   }
 
@@ -105,23 +74,21 @@ function redraw() {
 
 function tick() {
   walkers.forEach(updateWalker);
-
-  draw();
+  walkers.forEach(addPixel);
 
   window.setImmediate(tick);
 }
 
-function getCMYKSrcPixel(x, y, dIndex) {
+function getSrcPixelBrightness(x, y) {
   if (!srcData) {
     return 0;
   }
-  var index = Math.floor(x) * 4 + Math.floor(y) * srcData.width * 4;
+  var index = (Math.floor(x) + Math.floor(y) * srcData.width) * 4;
   var r = srcData.data[index];
   var g = srcData.data[index + 1];
   var b = srcData.data[index + 2];
 
-  return rgb2cmyk(r, g, b)[dIndex];
-
+  return (r + g + b) / (255 * 3);
 }
 
 function loadImage() {
@@ -137,8 +104,25 @@ function loadImage() {
 
     srcCanvas.width = width;
     srcCanvas.height = height;
-    srcCtx.drawImage(img, 0, 0, width, height);
-    srcData = srcCtx.getImageData(0, 0, width, height);
+
+    var imgRatio = img.width / img.height;
+    var cvsRatio = srcCanvas.width / srcCanvas.height;
+
+    if (imgRatio > cvsRatio) {
+      height = srcCanvas.height;
+      width = srcCanvas.height * imgRatio;
+      x = (srcCanvas.width - width) / 2;
+      y = 0;
+    }
+    else {
+      width = srcCanvas.width;
+      height = srcCanvas.width / imgRatio;
+      x = 0;
+      y = (srcCanvas.height - height) / 2;
+    }
+
+    srcCtx.drawImage(img, x, y, width, height);
+    srcData = srcCtx.getImageData(0, 0, srcCanvas.width, srcCanvas.height);
   };
   img.src = src;
 }
@@ -146,35 +130,35 @@ function loadImage() {
 function init() {
 
   canvas = document.querySelectorAll('canvas')[0];
+  indicator = document.querySelectorAll('canvas')[1];
   ctx = canvas.getContext("2d");
 
   canvas.width = canvas.parentNode.offsetWidth;
   canvas.height = canvas.parentNode.offsetHeight;
 
-  ctx.fillStyle = "rgba(255,255,255,1)";
+  indicator.width = canvas.width;
+  indicator.height = canvas.height;
+
+  ctx.fillStyle = "rgba(0,0,0,1)";
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
   imagedata = ctx.getImageData(0, 0, canvas.width, canvas.height);
-
-  cmykPixels = [];
-  for (var i = 0; i < canvas.width * canvas.height; i++) {
-    cmykPixels.push([0, 0, 0, 0]);
-  }
 
   initFileDrop();
   loadImage();
 
   walkers = [];
 
-  for (var i = 0; i < 320; i++) {
+  for (var i = 0; i < canvas.width * canvas.height / 2000; i++) {
     walkers.push({
       x: Math.floor(Math.random() * canvas.width),
       y: Math.floor(Math.random() * canvas.height),
       direction: Math.random() * Math.PI * 2,
       ddirection: 0,
-      speed: 20,
-      color: i % 5,
-      size: Math.random() * 2
+      speed: 0,
+      color: Math.random() > 0.5 ? 1 : 0,
+      speedyness: 1 + Math.random() * 8,
+      alpha: 0.05 + Math.pow(Math.random(), 8) * 0.1
     });
   }
 }
@@ -184,9 +168,9 @@ init();
 
 // Prepare to allow droppings
 function initFileDrop() {
-  canvas.addEventListener('dragover', dragOver, false);
-  canvas.addEventListener('dragenter', dragOver, false);
-  canvas.addEventListener('drop', fileDropped, false);
+  indicator.addEventListener('dragover', dragOver, false);
+  indicator.addEventListener('dragenter', dragOver, false);
+  indicator.addEventListener('drop', fileDropped, false);
 }
 
 function dragOver(e) {
@@ -211,74 +195,6 @@ function fileDropped(e) {
     loadImage();
   };
   reader.readAsDataURL(files[0]);
-}
-
-function rgb2cmyk(r, g, b) {
-  var c = 0;
-  var m = 0;
-  var y = 0;
-  var k = 0;
-
-  // BLACK
-  if (r === 0 && g === 0 && b === 0) {
-    k = 1;
-    return [0, 0, 0, 1];
-  }
-
-  c = 1 - (r / 255);
-  m = 1 - (g / 255);
-  y = 1 - (b / 255);
-
-  var minCMY = Math.min(c, Math.min(m, y));
-  c = (c - minCMY) / (1 - minCMY);
-  m = (m - minCMY) / (1 - minCMY);
-  y = (y - minCMY) / (1 - minCMY);
-  k = minCMY;
-
-  return [c, m, y, k];
-}
-
-function cmyk2rgb(c, m, y, k) {
-
-  r = 1 - Math.min(1, c * (1 - k) + k);
-  g = 1 - Math.min(1, m * (1 - k) + k);
-  b = 1 - Math.min(1, y * (1 - k) + k);
-
-  r = Math.round(r * 255);
-  g = Math.round(g * 255);
-  b = Math.round(b * 255);
-
-  return [r, g, b];
-}
-
-function addCMYKPixel(x, y, c, m, yel, k) {
-
-  var index = coordToIndex(x, y);
-
-  if (index === false) {
-    return;
-  }
-
-  var currentCmyk = cmykPixels[index];
-  var alpha = 0.025;
-  currentCmyk[0] = Math.min(1, currentCmyk[0] + alpha * c);
-  currentCmyk[1] = Math.min(1, currentCmyk[1] + alpha * m);
-  currentCmyk[2] = Math.min(1, currentCmyk[2] + alpha * yel);
-  currentCmyk[3] = Math.min(1, currentCmyk[3] + alpha * k);
-
-  if (c + m + yel + k === 0) {
-    currentCmyk[0] *= 1 - alpha;
-    currentCmyk[1] *= 1 - alpha;
-    currentCmyk[2] *= 1 - alpha;
-    currentCmyk[3] *= 1 - alpha;
-  }
-
-  setCMYKPixel(x, y, currentCmyk[0], currentCmyk[1], currentCmyk[2], currentCmyk[3]);
-}
-
-function setCMYKPixel(x, y, c, m, yel, k) {
-  var rgb = cmyk2rgb(c, m, yel, k);
-  setRGBPixel(x, y, rgb[0], rgb[1], rgb[2]);
 }
 
 function setRGBPixel(x, y, r, g, b) {
@@ -323,7 +239,8 @@ function loadFlickrImageURLs() {
     loadImage();
   };
   var script = document.createElement('script');
-  script.src = 'https://api.flickr.com/services/feeds/photos_public.gne?format=json&jsoncallback=loaded'
+  script.src =
+    'https://api.flickr.com/services/feeds/photos_public.gne?tags=amsterdam&format=json&jsoncallback=loaded';
 
   document.getElementsByTagName('head')[0].appendChild(script);
 }
