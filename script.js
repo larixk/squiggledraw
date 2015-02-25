@@ -5,7 +5,7 @@ var ctx;
 var imageData;
 var srcData;
 
-var FRAME_SKIP = 1;
+var FRAME_SKIP = 2;
 var frame = 0;
 
 var src = "test.jpg";
@@ -18,34 +18,35 @@ function updateWalker(w) {
     localSpeed = 1 - localSpeed;
   }
 
-  localSpeed = Math.max(0.1, localSpeed);
-  var maxTurn = Math.pow(1 - localSpeed, 6);
+  localSpeed = 1 + Math.pow(localSpeed, 2) * 50;
 
-  w.ddirection += (Math.random() - 0.5) * maxTurn;
-  w.ddirection = Math.max(-maxTurn, Math.min(maxTurn, w.ddirection));
-  w.direction += w.ddirection;
+  var dx = Math.round((Math.random() - 0.5) * localSpeed);
+  var dy = Math.round((Math.random() - 0.5) * localSpeed);
 
-  localSpeed *= w.speedyness;
-  var dx = Math.cos(w.direction) * localSpeed;
-  var dy = Math.sin(w.direction) * localSpeed;
+  // dx = w.dx * localSpeed;
+  // dy = w.dy * localSpeed;
 
-  w.x += canvas.width + dx;
-  w.y += canvas.height + dy;
+  w.x += dx;
+  w.y += dy;
 
-  w.x %= canvas.width;
-  w.y %= canvas.height;
+  if (w.x < 0 || w.y < 0 || w.x >= canvas.width || w.y >= canvas.height) {
+    w.x = canvas.width / 2;
+    w.y = canvas.height / 2;
+    // w.dx = (Math.random() - 0.5) * 20;
+    // w.dy = (Math.random() - 0.5) * 20;
+  }
 
 }
 
 function addPixel(w) {
   var index = (Math.floor(w.x) + Math.floor(w.y) * imagedata.width) * 4;
+  var oldColor = imagedata.data[index];
   color = w.color * 255;
-  color = imagedata.data[index] + w.alpha * (color - imagedata.data[index]);
+  color = oldColor + w.alpha * (color - oldColor);
 
   imagedata.data[index] = color;
   imagedata.data[index + 1] = color;
   imagedata.data[index + 2] = color;
-  imagedata.data[index + 3] = 255;
 }
 
 function redraw() {
@@ -55,17 +56,6 @@ function redraw() {
   if (frame === 0) {
     if (ctx) {
       ctx.putImageData(imagedata, 0, 0);
-
-      // var indicatorCtx = indicator.getContext("2d");
-      // indicator.width = indicator.width;
-      // walkers.forEach(function(w) {
-      //   var c = w.color * 255;
-      //   indicatorCtx.fillStyle = 'rgba(' + c + ',' + c + ',' + c + ',1)';
-      //   indicatorCtx.beginPath();
-      //   indicatorCtx.arc(Math.floor(w.x), Math.floor(w.y), 10 / w.speedyness, 0, 2 * Math.PI);
-      //   indicatorCtx.fill();
-      //   // indicatorCtx.fillRect(Math.floor(w.x) - 4, Math.floor(w.y) - 4, 8, 8);
-      // });
     }
   }
 
@@ -92,39 +82,48 @@ function getSrcPixelBrightness(x, y) {
 }
 
 function loadImage() {
-  var srcCanvas = document.createElement('canvas');
-  document.body.appendChild(srcCanvas);
-  var srcCtx = srcCanvas.getContext("2d");
   var img = new Image();
   img.crossOrigin = "Anonymous";
 
   img.onload = function() {
-    var width = canvas.width;
-    var height = canvas.height;
-
-    srcCanvas.width = width;
-    srcCanvas.height = height;
-
-    var imgRatio = img.width / img.height;
-    var cvsRatio = srcCanvas.width / srcCanvas.height;
-
-    if (imgRatio > cvsRatio) {
-      height = srcCanvas.height;
-      width = srcCanvas.height * imgRatio;
-      x = (srcCanvas.width - width) / 2;
-      y = 0;
-    }
-    else {
-      width = srcCanvas.width;
-      height = srcCanvas.width / imgRatio;
-      x = 0;
-      y = (srcCanvas.height - height) / 2;
-    }
-
-    srcCtx.drawImage(img, x, y, width, height);
-    srcData = srcCtx.getImageData(0, 0, srcCanvas.width, srcCanvas.height);
+    drawCentered(img);
   };
   img.src = src;
+}
+
+function drawCentered(img) {
+  var srcCanvas = document.createElement('canvas');
+  document.body.appendChild(srcCanvas);
+  var srcCtx = srcCanvas.getContext("2d");
+
+  var width = canvas.width;
+  var height = canvas.height;
+
+  srcCanvas.width = width;
+  srcCanvas.height = height;
+
+  var imgRatio = img.width / img.height;
+  var cvsRatio = srcCanvas.width / srcCanvas.height;
+
+  if (imgRatio > cvsRatio) {
+    height = srcCanvas.height;
+    width = srcCanvas.height * imgRatio;
+    x = (srcCanvas.width - width) / 2;
+    y = 0;
+  } else {
+    width = srcCanvas.width;
+    height = srcCanvas.width / imgRatio;
+    x = 0;
+    y = (srcCanvas.height - height) / 2;
+  }
+
+  srcCtx.save();
+  srcCtx.scale(-1, 1);
+  srcCtx.drawImage(img, -width, y, width, height);
+  srcCtx.restore();
+
+  srcData = srcCtx.getImageData(0, 0, srcCanvas.width, srcCanvas.height);
+
 }
 
 function init() {
@@ -139,7 +138,7 @@ function init() {
   indicator.width = canvas.width;
   indicator.height = canvas.height;
 
-  ctx.fillStyle = "rgba(0,0,0,1)";
+  ctx.fillStyle = "rgba(128,128,128,1)";
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
   imagedata = ctx.getImageData(0, 0, canvas.width, canvas.height);
@@ -151,14 +150,14 @@ function init() {
 
   for (var i = 0; i < canvas.width * canvas.height / 2000; i++) {
     walkers.push({
-      x: Math.floor(Math.random() * canvas.width),
-      y: Math.floor(Math.random() * canvas.height),
-      direction: Math.random() * Math.PI * 2,
-      ddirection: 0,
-      speed: 0,
-      color: Math.random() > 0.5 ? 1 : 0,
-      speedyness: 1 + Math.random() * 8,
-      alpha: 0.05 + Math.pow(Math.random(), 8) * 0.1
+      // x: Math.floor(Math.random() * canvas.width),
+      // y: Math.floor(Math.random() * canvas.height),
+      x: Math.floor(0.5 * canvas.width),
+      y: Math.floor(0.5 * canvas.height),
+      // dx: (Math.random() - 0.5) * 20,
+      // dy: (Math.random() - 0.5) * 20,
+      color: i % 2,
+      alpha: Math.pow(Math.random(), 2) * 0.25
     });
   }
 }
@@ -197,20 +196,6 @@ function fileDropped(e) {
   reader.readAsDataURL(files[0]);
 }
 
-function setRGBPixel(x, y, r, g, b) {
-  if (x < 0 || x > imagedata.width) {
-    return;
-  }
-  if (y < 0 || y > imagedata.height) {
-    return;
-  }
-  var index = coordToIndex(x, y) * 4;
-  imagedata.data[index] = r;
-  imagedata.data[index + 1] = g;
-  imagedata.data[index + 2] = b;
-  imagedata.data[index + 3] = 255;
-}
-
 function coordToIndex(x, y) {
   if (!imagedata) {
     return false;
@@ -240,18 +225,45 @@ function loadFlickrImageURLs() {
   };
   var script = document.createElement('script');
   script.src =
-    'https://api.flickr.com/services/feeds/photos_public.gne?tags=amsterdam&format=json&jsoncallback=loaded';
+    'https://api.flickr.com/services/feeds/photos_public.gne?tags=black%20%26%20white&format=json&jsoncallback=loaded';
 
   document.getElementsByTagName('head')[0].appendChild(script);
 }
 
 loadFlickrImageURLs();
 
-document.body.addEventListener('click', function(e) {
+function rotate() {
   if (flickrImages.length < flickrIndex + 1) {
-    return;
+    flickrIndex = -1;
   }
   flickrIndex++;
   src = flickrImages[flickrIndex].media.m;
   loadImage();
+}
+document.body.addEventListener('click', rotate);
+
+setInterval(function() {
+  if (!v) {
+    rotate();
+  }
+}, 10000);
+
+var v;
+navigator.webkitGetUserMedia({
+  video: true
+}, function(stream) {
+  v = document.createElement('video');
+  document.body.appendChild(v);
+  v.src = URL.createObjectURL(stream);
+  v.width = 480;
+  v.height = 360;
+  v.play();
+}, function(e) {
+  console.log(e);
 });
+
+setInterval(function() {
+  if (v) {
+    drawCentered(v);
+  }
+}, 100);
