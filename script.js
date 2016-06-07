@@ -1,11 +1,24 @@
 var walkers = [];
 
+var survivors;
+
 var canvas;
 var ctx;
 var imageData;
 var srcData;
 
 var width, height;
+var numWalkers;
+
+function shuffle(a) {
+    var j, x, i;
+    for (i = a.length; i; i -= 1) {
+        j = Math.floor(Math.random() * i);
+        x = a[i - 1];
+        a[i - 1] = a[j];
+        a[j] = x;
+    }
+}
 
 function getPixelBrightness(srcData, location) {
   if (!srcData) {
@@ -16,38 +29,75 @@ function getPixelBrightness(srcData, location) {
   var g = srcData[index + 1];
   var b = srcData[index + 2];
 
-  return (r + g + b) / (755);
+  return (r + g + b) / (768);
 }
 
 function addPixel(data, walker) {
-  var index = (walker.x + walker.y * width) << 2;
-  var color = walker.color * 255;
-  var oldColor = data[index];
-  color = oldColor + walker.alpha * (color - oldColor);
+  // var index = (walker.x + walker.y * width) << 2;
+  // var color = walker.color * 255;
+  // var oldColor = data[index];
+  var alpha = walker.alpha;
+  // color = oldColor + alpha * (color - oldColor);
+  ctx.strokeStyle = walker.color ? 'rgba(255,255,255,' + alpha + ')' : 'rgba(0,0,0,' + alpha + ')';
+  ctx.lineWidth = walker.size * walker.hp;
+  ctx.lineCap = "round";
+  ctx.beginPath();
+  ctx.moveTo(walker.previousX, walker.previousY);
+  ctx.lineTo(walker.x, walker.y);
+  ctx.stroke();
+  // ctx.arc(walker.x, walker.y, walker.size * walker.hp, 0, 2 * Math.PI);
+  // ctx.fill();
 
-  data[index] = data[index + 1] = data[index + 2] = color;
+  // data[index] = data[index + 1] = data[index + 2] = color;
 }
 
 function updateWalker(walker) {
   var localSpeed = getPixelBrightness(srcData, walker);
 
-  if (walker.color === 1) {
+  if (walker.color === 0) {
     localSpeed = 1 - localSpeed;
   }
 
-  localSpeed = 1 + localSpeed * localSpeed * 50;
+  // localSpeed = Math.pow(localSpeed, 1.2);
+  // localSpeed = Math.max(0.1, localSpeed);
 
-  walker.realX += (Math.random() - 0.5) * localSpeed;
-  walker.realY += (Math.random() - 0.5) * localSpeed;
+  // if(localSpeed < 0.5) {
+  //   walker.ddirection = 8 * (Math.random() - 0.5);
+  // } else {
+  //   walker.ddirection = 0.1 * (Math.random() - 0.5);
+  // }
+  // walker.ddirection = Math.pow(1 - localSpeed, 2) * ((Math.random() - 0.5) * 10);
+  walker.ddirection += (Math.random() -0.5) * 0.2;
+  walker.ddirection *= 0.95;
 
-  if (walker.x < 0 || walker.y < 0 || walker.x >= width || walker.y >= height) {
-    walker.realX = width / 2;
-    walker.realY = height / 2;
-  }
+  // walker.ddirection += (Math.random() - 0.5) * Math.pow(localSpeed, 2);
+  walker.ddirection = Math.min(2, Math.max(-2, walker.ddirection));
+  walker.direction += walker.ddirection;
+
+  var speed = 1 + Math.pow(localSpeed, 1.5) * 10; //1 + Math.pow(localSpeed, 20) * walker.hp * walker.size;
+  speed = (1 + Math.pow(1 - localSpeed, 2)) * walker.size * walker.hp;
+  walker.alpha = localSpeed * 0.2;
+  walker.realX += speed * Math.cos(walker.direction);
+  walker.realY += speed * Math.sin(walker.direction);
+
+  walker.previousX = walker.x;
+  walker.previousY = walker.y;
   walker.x = Math.round(walker.realX);
   walker.y = Math.round(walker.realY);
+  if (walker.x < 0 || walker.y < 0 || walker.x >= width || walker.y >= height) {
+    walker.hp = 0;
+  }
 
-  addPixel(imageData.data, walker);
+  walker.hp -= 0.001 * (0.5 - localSpeed);
+  walker.hp = Math.min(1, walker.hp);
+
+  if (walker.hp > 0) {
+    addPixel(imageData.data, walker);
+    survivors.push(walker);
+  }else {
+    addWalker(survivors);
+  }
+
 }
 
 
@@ -94,10 +144,13 @@ function loadImage(src) {
 
 function addWalker(walkers) {
   walkers.push({
-    realX: Math.floor(0.5 * width),
-    realY: Math.floor(0.5 * height),
+    direction: Math.random() * Math.PI * 2,
+    ddirection: 0,
+    size: 2 + Math.pow(Math.random(), 1) * 10,
+    realX: Math.random() * width,
+    realY: Math.random() * height,
     color: Math.random() > 0.5 ? 1 : 0,
-    alpha: Math.pow(Math.random(), 2) * 0.25
+    hp: Math.random()
   });
 }
 
@@ -112,7 +165,9 @@ function init() {
   width = canvas.width;
   height = canvas.height;
 
-  ctx.fillStyle = "rgba(128,128,128,1)";
+  numWalkers = width * height / 500
+
+  ctx.fillStyle = "rgba(127,127,127,1)";
   ctx.fillRect(0, 0, width, height);
 
   imageData = ctx.getImageData(0, 0, width, height);
@@ -121,56 +176,24 @@ function init() {
   loadImage("test.jpg");
 
   walkers = [];
-  for (var i = 0; i < width * height / 5000; i += 1) {
+  console.log(width * height / 500);
+  for (var i = 0; i < numWalkers; i += 1) {
     addWalker(walkers);
   }
 }
 
 window.tick(function () {
-  walkers.forEach(updateWalker);
-});
-window.setFrameSkippedInterval(function () {
-  if (ctx) {
-    ctx.putImageData(imageData, 0, 0);
+  if (!canvas) {
+    return;
   }
-}, 3);
+  survivors = [];
+  walkers.forEach(updateWalker);
+  walkers = survivors;
+});
 
 init();
 
-var flickrImages = [],
-flickrIndex = 0;
-
-function rotate() {
-  if (flickrImages.length < flickrIndex + 1) {
-    flickrIndex = -1;
-  }
-  flickrIndex += 1;
-  loadImage(flickrImages[flickrIndex].media.m);
-}
-document.body.addEventListener("click", rotate);
-
-function loadFlickrImageURLs() {
-
-  window.loaded = function(data) {
-    flickrImages = data.items;
-    rotate();
-  };
-  var script = document.createElement("script");
-  var src = "https://api.flickr.com/services/feeds/photos_public.gne";
-  src += "?tags=black%20%26%20white&format=json&jsoncallback=loaded";
-  script.src = src;
-  document.getElementsByTagName("head")[0].appendChild(script);
-}
-
-loadFlickrImageURLs();
-
 var v;
-
-setInterval(function() {
-  if (!v) {
-    rotate();
-  }
-}, 15000);
 
 navigator.webkitGetUserMedia({
   video: true
@@ -188,4 +211,4 @@ setInterval(function() {
   if (v) {
     srcData = drawCentered(v);
   }
-}, 300);
+}, 1000);
