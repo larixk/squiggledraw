@@ -9,6 +9,7 @@ var srcData;
 
 var width, height;
 var numWalkers;
+var liveWalkerCount;
 
 function shuffle(a) {
     var j, x, i;
@@ -20,7 +21,7 @@ function shuffle(a) {
     }
 }
 
-function getPixelBrightness(srcData, location) {
+function getPixelBrightness(srcData, location, color) {
   if (!srcData) {
     return 0;
   }
@@ -29,59 +30,54 @@ function getPixelBrightness(srcData, location) {
   var g = srcData[index + 1];
   var b = srcData[index + 2];
 
+  if (color === 1) {
+    return (r) / 256;
+  } else if( color === 2) {
+    return (g) / 256;
+  } else if( color === 3) {
+    return (b) / 256;
+  }
+
   return (r + g + b) / (768);
 }
 
 function addPixel(data, walker) {
-  // var index = (walker.x + walker.y * width) << 2;
-  // var color = walker.color * 255;
-  // var oldColor = data[index];
   var alpha = walker.alpha;
-  // color = oldColor + alpha * (color - oldColor);
-  ctx.strokeStyle = walker.color ? 'rgba(255,255,255,' + alpha + ')' : 'rgba(0,0,0,' + alpha + ')';
+  var colors = [
+    'rgba(255,255,255,' + alpha * 0.5 + ')',
+    'rgba(255,0,0,' + alpha + ')',
+    'rgba(0,255,0,' + alpha + ')',
+    'rgba(0,0,255,' + alpha + ')',
+    'rgba(0,0,0,' + alpha + ')',
+  ];
+  ctx.globalCompositeOperation = walker.color > 3 ? "normal" : "screen";
+  ctx.strokeStyle = colors[walker.color];
   ctx.lineWidth = walker.size * walker.hp;
   ctx.lineCap = "round";
   ctx.beginPath();
   ctx.moveTo(walker.previousX, walker.previousY);
   ctx.lineTo(walker.x, walker.y);
   ctx.stroke();
-  // ctx.arc(walker.x, walker.y, walker.size * walker.hp, 0, 2 * Math.PI);
-  // ctx.fill();
-
-  // data[index] = data[index + 1] = data[index + 2] = color;
 }
 
 function updateWalker(walker) {
-  var localSpeed = getPixelBrightness(srcData, walker);
+  var localSpeed;
 
-  if (walker.color === 0) {
-    localSpeed = 1 - localSpeed;
-  }
-
-
-
-  // localSpeed = Math.pow(localSpeed, 1.2);
-  // localSpeed = Math.max(0.1, localSpeed);
-
-  // if(localSpeed < 0.5) {
-  //   walker.ddirection = 8 * (Math.random() - 0.5);
-  // } else {
-  //   walker.ddirection = 0.1 * (Math.random() - 0.5);
-  // }
-  // walker.ddirection = Math.pow(1 - localSpeed, 2) * ((Math.random() - 0.5) * 10);
-  if (walker.localSpeed > localSpeed) {
-    walker.ddirection += (Math.random() -0.5) * 4;
+  if (walker.color > 3) {
+    localSpeed = 1 - getPixelBrightness(srcData, walker, walker.color);
   } else {
-    walker.ddirection *= 0.8;
+    localSpeed = getPixelBrightness(srcData, walker, walker.color);
+  }
+  if (walker.localSpeed > localSpeed) {
+    walker.ddirection += (Math.random() -0.5) * 2;
+  } else {
+    walker.ddirection *= 0.5;
   }
   walker.localSpeed = localSpeed;
 
-  // walker.ddirection += (Math.random() - 0.5) * Math.pow(localSpeed, 2);
-  walker.ddirection = Math.min(2, Math.max(-2, walker.ddirection));
   walker.direction += walker.ddirection;
 
-  var speed = 1 + Math.pow(localSpeed, 1.5) * 10; //1 + Math.pow(localSpeed, 20) * walker.hp * walker.size;
-  speed = (1 + Math.pow(1 - localSpeed, 2)) * walker.size * walker.hp * 2;
+  var speed = walker.size * walker.hp + Math.pow(localSpeed, 20) * 30;
   walker.alpha = Math.pow(localSpeed, 2) * 0.4;
   walker.realX += speed * Math.cos(walker.direction);
   walker.realY += speed * Math.sin(walker.direction);
@@ -91,18 +87,18 @@ function updateWalker(walker) {
   walker.x = Math.round(walker.realX);
   walker.y = Math.round(walker.realY);
 
-  walker.hp -= 0.001 * (0.6 - localSpeed);
+  walker.hp += 0.1 * (Math.random() - 0.6);
   walker.hp = Math.min(1, walker.hp);
 
+  addPixel(imageData.data, walker);
   if (walker.x < 0 || walker.y < 0 || walker.x >= width || walker.y >= height) {
     walker.hp = 0;
   }
 
   if (walker.hp > 0) {
-    addPixel(imageData.data, walker);
     survivors.push(walker);
   }else {
-    addWalker(survivors);
+    liveWalkerCount--;
   }
 
 }
@@ -150,13 +146,14 @@ function loadImage(src) {
 }
 
 function addWalker(walkers) {
+  liveWalkerCount++;
   walkers.push({
     direction: Math.random() * Math.PI * 2,
     ddirection: 0,
-    size: 2 + Math.pow(Math.random(), 5) * 50,
+    size: 2 + Math.pow(Math.random(), 10) * 300,
     realX: Math.random() * width,
     realY: Math.random() * height,
-    color: Math.random() > 0.5 ? 1 : 0,
+    color: 1 + Math.floor(Math.random() * 4),
     hp: Math.random()
   });
 }
@@ -174,7 +171,7 @@ function init() {
 
   numWalkers = width * height / 2000
 
-  ctx.fillStyle = "rgba(127,127,127,1)";
+  ctx.fillStyle = "rgba(0,0,0,1)";
   ctx.fillRect(0, 0, width, height);
 
   imageData = ctx.getImageData(0, 0, width, height);
@@ -183,7 +180,7 @@ function init() {
   loadImage("test.jpg");
 
   walkers = [];
-  console.log(width * height / 500);
+  liveWalkerCount = 0;
   for (var i = 0; i < numWalkers; i += 1) {
     addWalker(walkers);
   }
@@ -195,6 +192,23 @@ window.tick(function () {
   }
   survivors = [];
   walkers.forEach(updateWalker);
+  while (survivors.length < walkers.length) {
+    if (Math.random() > 0.9) {
+      addWalker(survivors);
+    } else {
+      var parentWalkerIndex = Math.floor(survivors.length * Math.random());
+      var parentWalker = survivors[parentWalkerIndex];
+      survivors.push({
+        direction: Math.random() * Math.PI * 2,
+        ddirection: 0,
+        size: 2 + Math.pow(Math.random(), 3) * 50,
+        realX: parentWalker.realX,
+        realY: parentWalker.realY,
+        color: parentWalker.color,
+        hp: Math.random()
+      })
+    }
+  }
   walkers = survivors;
 });
 
