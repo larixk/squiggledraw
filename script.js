@@ -58,6 +58,8 @@ function updateWalker(walker) {
     localSpeed = 1 - localSpeed;
   }
 
+
+
   // localSpeed = Math.pow(localSpeed, 1.2);
   // localSpeed = Math.max(0.1, localSpeed);
 
@@ -67,8 +69,12 @@ function updateWalker(walker) {
   //   walker.ddirection = 0.1 * (Math.random() - 0.5);
   // }
   // walker.ddirection = Math.pow(1 - localSpeed, 2) * ((Math.random() - 0.5) * 10);
-  walker.ddirection += (Math.random() -0.5) * 0.2;
-  walker.ddirection *= 0.95;
+  if (walker.localSpeed > localSpeed) {
+    walker.ddirection += (Math.random() -0.5) * 2;
+  } else {
+    walker.ddirection *= 0.8;
+  }
+  walker.localSpeed = localSpeed;
 
   // walker.ddirection += (Math.random() - 0.5) * Math.pow(localSpeed, 2);
   walker.ddirection = Math.min(2, Math.max(-2, walker.ddirection));
@@ -76,7 +82,7 @@ function updateWalker(walker) {
 
   var speed = 1 + Math.pow(localSpeed, 1.5) * 10; //1 + Math.pow(localSpeed, 20) * walker.hp * walker.size;
   speed = (1 + Math.pow(1 - localSpeed, 2)) * walker.size * walker.hp;
-  walker.alpha = localSpeed * 0.2;
+  walker.alpha = localSpeed * 0.4;
   walker.realX += speed * Math.cos(walker.direction);
   walker.realY += speed * Math.sin(walker.direction);
 
@@ -84,12 +90,13 @@ function updateWalker(walker) {
   walker.previousY = walker.y;
   walker.x = Math.round(walker.realX);
   walker.y = Math.round(walker.realY);
+
+  walker.hp -= 0.001 * (0.6 - localSpeed);
+  walker.hp = Math.min(1, walker.hp);
+
   if (walker.x < 0 || walker.y < 0 || walker.x >= width || walker.y >= height) {
     walker.hp = 0;
   }
-
-  walker.hp -= 0.001 * (0.5 - localSpeed);
-  walker.hp = Math.min(1, walker.hp);
 
   if (walker.hp > 0) {
     addPixel(imageData.data, walker);
@@ -146,7 +153,7 @@ function addWalker(walkers) {
   walkers.push({
     direction: Math.random() * Math.PI * 2,
     ddirection: 0,
-    size: 2 + Math.pow(Math.random(), 1) * 10,
+    size: 2 + Math.pow(Math.random(), 4) * 100,
     realX: Math.random() * width,
     realY: Math.random() * height,
     color: Math.random() > 0.5 ? 1 : 0,
@@ -165,7 +172,7 @@ function init() {
   width = canvas.width;
   height = canvas.height;
 
-  numWalkers = width * height / 500
+  numWalkers = width * height / 2000
 
   ctx.fillStyle = "rgba(127,127,127,1)";
   ctx.fillRect(0, 0, width, height);
