@@ -44,7 +44,7 @@ function getPixelBrightness(srcData, location, color) {
 function addPixel(data, walker) {
   var alpha = walker.alpha;
   var colors = [
-    'rgba(255,255,255,' + alpha * 0.5 + ')',
+    'rgba(255,255,255,' + alpha + ')',
     'rgba(255,0,0,' + alpha + ')',
     'rgba(0,255,0,' + alpha + ')',
     'rgba(0,0,255,' + alpha + ')',
@@ -78,7 +78,7 @@ function updateWalker(walker) {
   walker.direction += walker.ddirection;
 
   var speed = walker.size * walker.hp + Math.pow(localSpeed, 20) * 30;
-  walker.alpha = Math.pow(localSpeed, 2) * 0.4;
+  walker.alpha = Math.pow(localSpeed, 2) * 1;
   walker.realX += speed * Math.cos(walker.direction);
   walker.realY += speed * Math.sin(walker.direction);
 
@@ -150,7 +150,7 @@ function addWalker(walkers) {
   walkers.push({
     direction: Math.random() * Math.PI * 2,
     ddirection: 0,
-    size: 2 + Math.pow(Math.random(), 10) * 300,
+    size: 2 + Math.pow(Math.random(), 2) * 30,
     realX: Math.random() * width,
     realY: Math.random() * height,
     color: 1 + Math.floor(Math.random() * 4),
@@ -193,7 +193,7 @@ window.tick(function () {
   survivors = [];
   walkers.forEach(updateWalker);
   while (survivors.length < walkers.length) {
-    if (Math.random() > 0.9) {
+    if (Math.random() > 0.1) {
       addWalker(survivors);
     } else {
       var parentWalkerIndex = Math.floor(survivors.length * Math.random());
