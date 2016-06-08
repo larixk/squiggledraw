@@ -70,7 +70,7 @@ function updateWalker(walker) {
   // }
   // walker.ddirection = Math.pow(1 - localSpeed, 2) * ((Math.random() - 0.5) * 10);
   if (walker.localSpeed > localSpeed) {
-    walker.ddirection += (Math.random() -0.5) * 2;
+    walker.ddirection += (Math.random() -0.5) * 4;
   } else {
     walker.ddirection *= 0.8;
   }
@@ -81,8 +81,8 @@ function updateWalker(walker) {
   walker.direction += walker.ddirection;
 
   var speed = 1 + Math.pow(localSpeed, 1.5) * 10; //1 + Math.pow(localSpeed, 20) * walker.hp * walker.size;
-  speed = (1 + Math.pow(1 - localSpeed, 2)) * walker.size * walker.hp;
-  walker.alpha = localSpeed * 0.4;
+  speed = (1 + Math.pow(1 - localSpeed, 2)) * walker.size * walker.hp * 2;
+  walker.alpha = Math.pow(localSpeed, 2) * 0.4;
   walker.realX += speed * Math.cos(walker.direction);
   walker.realY += speed * Math.sin(walker.direction);
 
@@ -153,7 +153,7 @@ function addWalker(walkers) {
   walkers.push({
     direction: Math.random() * Math.PI * 2,
     ddirection: 0,
-    size: 2 + Math.pow(Math.random(), 4) * 100,
+    size: 2 + Math.pow(Math.random(), 5) * 50,
     realX: Math.random() * width,
     realY: Math.random() * height,
     color: Math.random() > 0.5 ? 1 : 0,
