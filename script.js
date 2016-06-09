@@ -26,32 +26,39 @@ function getPixelBrightness(srcData, location, color) {
     return 0;
   }
   var index = (location.x + location.y * width) << 2;
-  var r = srcData[index];
-  var g = srcData[index + 1];
-  var b = srcData[index + 2];
+  var r = Math.abs(srcData[index + 0] - color[0]);
+  var g = Math.abs(srcData[index + 1] - color[1]);
+  var b = Math.abs(srcData[index + 2] - color[2]);
 
-  if (color === 1) {
-    return (r) / 256;
-  } else if( color === 2) {
-    return (g) / 256;
-  } else if( color === 3) {
-    return (b) / 256;
-  }
+  // if (color === 1) {
+  //   return (r) / 256;
+  // } else if( color === 2) {
+  //   return (g) / 256;
+  // } else if( color === 3) {
+  //   return (b) / 256;
+  // }
 
-  return (r + g + b) / (768);
+  return 1 - (r + g + b) / 768;
+}
+
+function lerp(a,b,t) {
+  return a + (b - a) * t;
 }
 
 function addPixel(data, walker) {
-  var alpha = walker.alpha;
-  var colors = [
-    'rgba(255,255,255,' + alpha + ')',
-    'rgba(255,0,0,' + alpha + ')',
-    'rgba(0,255,0,' + alpha + ')',
-    'rgba(0,0,255,' + alpha + ')',
-    'rgba(0,0,0,' + alpha + ')',
-  ];
-  ctx.globalCompositeOperation = walker.color > 3 ? "normal" : "screen";
-  ctx.strokeStyle = colors[walker.color];
+  var alpha = walker.alpha > 0.25 ? 1 : 0;
+  // alpha = lerp(alpha, 0, 0.1);
+  // var colors = [
+  //   'rgba(255,255,255,' + alpha + ')',
+  //   'rgba(255,0,0,' + alpha + ')',
+  //   'rgba(0,255,0,' + alpha + ')',
+  //   'rgba(0,0,255,' + alpha + ')',
+  //   'rgba(0,0,0,' + lerp(lerp(alpha, 0, 0.3), 1, 0.3) + ')',
+  // ];
+  // ctx.globalCompositeOperation = walker.color > 3 ? "normal" : "screen";
+  // ctx.strokeStyle = colors[walker.color];
+  ctx.globalCompositeOperation = walker.blend;
+  ctx.strokeStyle = 'rgba(' + walker.color[0] + ',' + walker.color[1] + ',' + walker.color[2] + ',' + alpha + ')';
   ctx.lineWidth = walker.size * walker.hp;
   ctx.lineCap = "round";
   ctx.beginPath();
@@ -62,12 +69,8 @@ function addPixel(data, walker) {
 
 function updateWalker(walker) {
   var localSpeed;
-
-  if (walker.color > 3) {
-    localSpeed = 1 - getPixelBrightness(srcData, walker, walker.color);
-  } else {
-    localSpeed = getPixelBrightness(srcData, walker, walker.color);
-  }
+  localSpeed = getPixelBrightness(srcData, walker, walker.color);
+  localSpeed = Math.pow(localSpeed, 4);
   if (walker.localSpeed > localSpeed) {
     walker.ddirection += (Math.random() -0.5) * 2;
   } else {
@@ -79,6 +82,20 @@ function updateWalker(walker) {
 
   var speed = walker.size * walker.hp + Math.pow(localSpeed, 20) * 30;
   walker.alpha = Math.pow(localSpeed, 2) * 1;
+
+  if (localSpeed < 0) {
+    console.error("?");
+  }
+  if (localSpeed > 1) {
+    console.error("?");
+  }
+  if (walker.alpha < 0) {
+    console.error("?");
+  }
+  if (walker.alpha > 1) {
+    console.error("?");
+  }
+
   walker.realX += speed * Math.cos(walker.direction);
   walker.realY += speed * Math.sin(walker.direction);
 
@@ -153,7 +170,13 @@ function addWalker(walkers) {
     size: 2 + Math.pow(Math.random(), 2) * 30,
     realX: Math.random() * width,
     realY: Math.random() * height,
-    color: 1 + Math.floor(Math.random() * 4),
+    blend: Math.random() > 0.5 ? 'normal' : 'normal',
+    // color: 1 + Math.floor(Math.random() * 4),
+    color: [
+      Math.floor(Math.random() * 255),
+      Math.floor(Math.random() * 255),
+      Math.floor(Math.random() * 255)
+    ],
     hp: Math.random()
   });
 }
@@ -169,7 +192,7 @@ function init() {
   width = canvas.width;
   height = canvas.height;
 
-  numWalkers = width * height / 2000
+  numWalkers = width * height / 500
 
   ctx.fillStyle = "rgba(0,0,0,1)";
   ctx.fillRect(0, 0, width, height);
@@ -201,6 +224,7 @@ window.tick(function () {
       survivors.push({
         direction: Math.random() * Math.PI * 2,
         ddirection: 0,
+        blend: parentWalker.blend,
         size: 2 + Math.pow(Math.random(), 3) * 50,
         realX: parentWalker.realX,
         realY: parentWalker.realY,
@@ -232,4 +256,4 @@ setInterval(function() {
   if (v) {
     srcData = drawCentered(v);
   }
-}, 1000);
+}, 300);
